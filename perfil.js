@@ -5,13 +5,23 @@
   const VERSION = '1.1.0'; // subimos de versión al consumir tokens
   const datos = { nombre: '', ciudad: 'Valledupar' };  // estado propio
 
+  const URL_TOKENS = 'https://design-tokens-saborupc.onrender.com/tokens.css';
+
+  function cargarTokens() {
+    if (!document.querySelector(`link[href="${URL_TOKENS}"]`)) return; // ya cargado
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = URL_TOKENS;
+      document.head.appendChild(link);
+  }
+
   class MfePerfil extends HTMLElement {
     connectedCallback() {
+      cargarTokens();
       // Shadow DOM: estilos y marcado encapsulados. Ni el contenedor ni
       // otros micro frontends pueden afectar (ni ser afectados por) este CSS.
       const sombra = this.shadowRoot || this.attachShadow({ mode: 'open' });
       sombra.innerHTML = `
-        <link rel="stylesheet" href="http://localhost:8081/tokens.css">
         <style>
           :host { display: block; }
           h2 { color: var(--color-exito, #1b7a3e); margin: 0 0 4px; }
@@ -47,21 +57,23 @@
         <span class="version">mfe-perfil v${VERSION} · Web Component</span>
         <form>
           <label>Nombre</label>
-          <input name="nombre" value="${datos.nombre}" placeholder="Escribe tu nombre" required>
+          <input name="nombre" placeholder="Escribe tu nombre" required>
           <label>Ciudad</label>
-          <input name="ciudad" value="${datos.ciudad}">
+          <input name="ciudad">
           <button type="submit">Guardar</button>
           <p class="ok"></p>
         </form>`;
 
-      sombra.querySelector('form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const f = e.target;
-        datos.nombre = f.nombre.value.trim();
-        datos.ciudad = f.ciudad.value.trim();
-        sombra.querySelector('.ok').textContent = 'Datos guardados.';
-        window.dispatchEvent(new CustomEvent('usuario:cambio', { detail: { nombre: datos.nombre } }));
-      });
+        const f = sombra.querySelector('form');
+        f.nombre.value = datos.nombre;
+        f.ciudad.value = datos.ciudad;
+        f.addEventListener('submit', (e) => {
+          e.preventDefault();
+          datos.nombre = f.nombre.value;
+          datos.ciudad = f.ciudad.value;
+          sombra.querySelector('.ok').textContent = '¡Datos guardados!';
+          window.dispatchEvent(new CustomEvent('usuario:cambio', { detail: { nombre: datos.nombre } }));
+        });
     }
 
     disconnectedCallback() {
