@@ -8,7 +8,7 @@
   const URL_TOKENS = 'https://design-tokens-saborupc.onrender.com/tokens.css';
 
   function cargarTokens() {
-    if (!document.querySelector(`link[href="${URL_TOKENS}"]`)) return; // ya cargado
+    if (document.querySelector(`link[href="${URL_TOKENS}"]`)) return; // ya cargado
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = URL_TOKENS;
@@ -69,8 +69,8 @@
         f.ciudad.value = datos.ciudad;
         f.addEventListener('submit', (e) => {
           e.preventDefault();
-          datos.nombre = f.nombre.value;
-          datos.ciudad = f.ciudad.value;
+          datos.nombre = f.nombre.value.trim();
+          datos.ciudad = f.ciudad.value.trim();
           sombra.querySelector('.ok').textContent = '¡Datos guardados!';
           window.dispatchEvent(new CustomEvent('usuario:cambio', { detail: { nombre: datos.nombre } }));
         });
