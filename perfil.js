@@ -1,18 +1,49 @@
 // Micro frontend: PERFIL  (equipo "Cuentas") — implementado como Web Component
 // Contrato: define la etiqueta <mfe-perfil>
-// Publica:  'usuario:cambio' { nombre }
+// Publica:  'usuario:cambio' { nombre, version }   (v1) — al guardar y al montarse si ya hay nombre
+// Estado:   sessionStorage['saborupc:perfil'] (propio de este micro frontend)
+// Config:   atributo data-tokens="URL/tokens.css" en la etiqueta script que carga este archivo
 (function () {
-  const VERSION = '1.1.0'; // subimos de versión al consumir tokens
-  const datos = { nombre: '', ciudad: 'Valledupar' };  // estado propio
+  if (customElements.get('mfe-perfil')) return;  // ya cargado
 
-  const URL_TOKENS = 'https://design-tokens-saborupc.onrender.com/tokens.css';
+  const VERSION = '1.2.0';
+  const CLAVE = 'saborupc:perfil';
+
+  // document.currentScript solo existe mientras el script se ejecuta: se lee aquí, de forma síncrona
+  const URL_TOKENS = (document.currentScript && document.currentScript.dataset.tokens)
+    || 'https://design-tokens-saborupc.onrender.com/tokens.css';
+
+  // ---- Estado propio, persistido en sessionStorage
+  const VACIO = { nombre: '', ciudad: 'Valledupar' };
+  function cargar() {
+    try {
+      const g = JSON.parse(sessionStorage.getItem(CLAVE) || 'null');
+      if (!g || typeof g !== 'object') return { ...VACIO };
+      return {
+        nombre: typeof g.nombre === 'string' ? g.nombre : VACIO.nombre,
+        ciudad: typeof g.ciudad === 'string' ? g.ciudad : VACIO.ciudad
+      };
+    } catch (e) {
+      return { ...VACIO };   // storage bloqueado o JSON dañado
+    }
+  }
+  function guardar() {
+    try { sessionStorage.setItem(CLAVE, JSON.stringify(datos)); } catch (e) { /* sigue en memoria */ }
+  }
+  const datos = cargar();
+
+  function publicar() {
+    window.dispatchEvent(new CustomEvent('usuario:cambio', {
+      detail: { nombre: datos.nombre, version: 1 }
+    }));
+  }
 
   function cargarTokens() {
-    if (document.querySelector(`link[href="${URL_TOKENS}"]`)) return; // ya cargado
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = URL_TOKENS;
-      document.head.appendChild(link);
+    if (document.querySelector('link[href="' + URL_TOKENS + '"]')) return; // ya cargado
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = URL_TOKENS;
+    document.head.appendChild(link);
   }
 
   class MfePerfil extends HTMLElement {
@@ -20,6 +51,7 @@
       cargarTokens();
       // Shadow DOM: estilos y marcado encapsulados. Ni el contenedor ni
       // otros micro frontends pueden afectar (ni ser afectados por) este CSS.
+      // Las variables CSS de los tokens sí lo atraviesan (se heredan).
       const sombra = this.shadowRoot || this.attachShadow({ mode: 'open' });
       sombra.innerHTML = `
         <style>
@@ -64,25 +96,28 @@
           <p class="ok"></p>
         </form>`;
 
-        const f = sombra.querySelector('form');
-        f.nombre.value = datos.nombre;
-        f.ciudad.value = datos.ciudad;
-        f.addEventListener('submit', (e) => {
-          e.preventDefault();
-          datos.nombre = f.nombre.value.trim();
-          datos.ciudad = f.ciudad.value.trim();
-          sombra.querySelector('.ok').textContent = '¡Datos guardados!';
-          window.dispatchEvent(new CustomEvent('usuario:cambio', { detail: { nombre: datos.nombre } }));
-        });
+      const f = sombra.querySelector('form');
+      f.elements.nombre.value = datos.nombre;
+      f.elements.ciudad.value = datos.ciudad;
+      f.addEventListener('submit', (e) => {
+        e.preventDefault();
+        datos.nombre = f.elements.nombre.value.trim();
+        datos.ciudad = f.elements.ciudad.value.trim();
+        guardar();
+        sombra.querySelector('.ok').textContent = '¡Datos guardados!';
+        publicar();
+      });
+
+      // Si ya hay usuario (p. ej. tras recargar), avisa al resto de micro frontends
+      if (datos.nombre) publicar();
     }
 
     disconnectedCallback() {
-      // El navegador llama a este método cuando el contenedor retira el elemento
+      // El navegador llama a este método cuando el contenedor retira el elemento.
+      // No hay listeners globales que limpiar: los del formulario se van con el Shadow DOM.
       console.log('[mfe-perfil] desmontado');
     }
   }
 
-  if (!customElements.get('mfe-perfil')) {
-    customElements.define('mfe-perfil', MfePerfil);
-  }
+  customElements.define('mfe-perfil', MfePerfil);
 })();
